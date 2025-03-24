@@ -40,19 +40,37 @@ def parse_args(parser, argv=None):
 #     o.select = False
 #   obj.select = True
 #   bpy.ops.object.delete()
+# def delete_object(obj):
+#   """ Delete a specified blender object """
+#   # Deselect all objects
+#   bpy.ops.object.select_all(action='DESELECT')
+  
+#   # In newer Blender versions, selection is handled differently
+#   obj.select_set(True)
+  
+#   # Set the active object
+#   bpy.context.view_layer.objects.active = obj
+  
+#   # Delete the selected object
+#   bpy.ops.object.delete()
 def delete_object(obj):
-  """ Delete a specified blender object """
-  # Deselect all objects
-  bpy.ops.object.select_all(action='DESELECT')
-  
-  # In newer Blender versions, selection is handled differently
-  obj.select_set(True)
-  
-  # Set the active object
-  bpy.context.view_layer.objects.active = obj
-  
-  # Delete the selected object
-  bpy.ops.object.delete()
+    """ Delete a specified blender object """
+    # Deselect all objects
+    bpy.ops.object.select_all(action='DESELECT')
+    
+    # In newer Blender versions, selection is handled differently
+    if hasattr(obj, 'select'):
+        # Old Blender API
+        obj.select = True
+    else:
+        # New Blender API
+        obj.select_set(True)
+    
+    # Set the active object
+    bpy.context.view_layer.objects.active = obj
+    
+    # Delete the selected object
+    bpy.ops.object.delete()
 
 
 def get_camera_coords(cam, pos):
@@ -78,13 +96,49 @@ def get_camera_coords(cam, pos):
   return (px, py, z)
 
 
+# def set_layer(obj, layer_idx):
+#   """ Move an object to a particular layer """
+#   # Set the target layer to True first because an object must always be on
+#   # at least one layer.
+#   obj.layers[layer_idx] = True
+#   for i in range(len(obj.layers)):
+#     obj.layers[i] = (i == layer_idx)
 def set_layer(obj, layer_idx):
-  """ Move an object to a particular layer """
-  # Set the target layer to True first because an object must always be on
-  # at least one layer.
-  obj.layers[layer_idx] = True
-  for i in range(len(obj.layers)):
-    obj.layers[i] = (i == layer_idx)
+    """ Move an object to a particular layer """
+    # In newer Blender versions, we need to use collections instead of layers
+    if hasattr(obj, 'layers'):
+        # Old Blender API (2.7x)
+        # Set the target layer to True first because an object must always be on
+        # at least one layer.
+        obj.layers[layer_idx] = True
+        for i in range(len(obj.layers)):
+            obj.layers[i] = (i == layer_idx)
+    else:
+        # New Blender API (2.8+)
+        # First ensure the target collection exists
+        scene = bpy.context.scene
+        layer_collection = scene.collection
+        
+        # Remove from all existing collections
+        for collection in bpy.data.collections:
+            if obj.name in collection.objects:
+                collection.objects.unlink(obj)
+        
+        # Add to scene collection (equivalent to layer 0)
+        if layer_idx == 0:
+            if obj.name not in layer_collection.objects:
+                layer_collection.objects.link(obj)
+        else:
+            # Create a new collection for the layer if it doesn't exist
+            layer_name = f"Layer_{layer_idx}"
+            if layer_name not in bpy.data.collections:
+                new_collection = bpy.data.collections.new(layer_name)
+                layer_collection.children.link(new_collection)
+            
+            # Link the object to this collection
+            target_collection = bpy.data.collections[layer_name]
+            if obj.name not in target_collection.objects:
+                target_collection.objects.link(obj)
 
 
 def add_object(object_dir, name, scale, loc, theta=0):

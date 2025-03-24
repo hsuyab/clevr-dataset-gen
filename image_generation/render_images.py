@@ -517,15 +517,54 @@ def render_shadeless(blender_objects, path='flat.png'):
   """
   render_args = bpy.context.scene.render
 
+  # # Cache the render args we are about to clobber
+  # old_filepath = render_args.filepath
+  # old_engine = render_args.engine
+  # old_use_antialiasing = render_args.use_antialiasing
+
+  # # Override some render settings to have flat shading
+  # render_args.filepath = path
+  # render_args.engine = 'BLENDER_RENDER'
+  # render_args.use_antialiasing = False
   # Cache the render args we are about to clobber
   old_filepath = render_args.filepath
   old_engine = render_args.engine
-  old_use_antialiasing = render_args.use_antialiasing
+  # In newer Blender versions, anti-aliasing is controlled differently
+  # Just store the current settings for filter_size
+  old_filter_size = None
+  if hasattr(render_args, 'filter_size'):
+      old_filter_size = render_args.filter_size
+
+  # # Override some render settings to have flat shading
+  # render_args.filepath = path
+  # # Use EEVEE for newer Blender versions
+  # if bpy.app.version >= (2, 80, 0):
+  #     render_args.engine = 'BLENDER_EEVEE'
+  # else:
+  #     render_args.engine = 'BLENDER_RENDER'
+  #     if hasattr(render_args, 'use_antialiasing'):
+  #         render_args.use_antialiasing = False
 
   # Override some render settings to have flat shading
   render_args.filepath = path
-  render_args.engine = 'BLENDER_RENDER'
-  render_args.use_antialiasing = False
+
+  # Use appropriate renderer based on Blender version
+  if bpy.app.version >= (4, 0, 0):
+      # For Blender 4.x
+      render_args.engine = 'CYCLES'  # or 'BLENDER_WORKBENCH' or 'BLENDER_EEVEE_NEXT'
+  elif bpy.app.version >= (2, 80, 0):
+      # For Blender 2.8x - 3.x
+      render_args.engine = 'EEVEE'  # or 'BLENDER_EEVEE'
+  else:
+      # For older Blender versions
+      render_args.engine = 'BLENDER_RENDER'
+      if hasattr(render_args, 'use_antialiasing'):
+          render_args.use_antialiasing = False
+    # Disable anti-aliasing for newer Blender versions
+  if hasattr(render_args, 'filter_size'):
+        render_args.filter_size = 0.0
+
+
 
   # Move the lights and ground to layer 2 so they don't render
   utils.set_layer(bpy.data.objects['Lamp_Key'], 2)
@@ -545,9 +584,29 @@ def render_shadeless(blender_objects, path='flat.png'):
       r, g, b = [random.random() for _ in range(3)]
       if (r, g, b) not in object_colors: break
     object_colors.add((r, g, b))
-    mat.diffuse_color = [r, g, b]
-    mat.use_shadeless = True
-    obj.data.materials[0] = mat
+    # mat.diffuse_color = [r, g, b]
+    mat.diffuse_color = [r, g, b, 1.0]  # Adding alpha=1.0 as the fourth value
+
+    # mat.use_shadeless = True
+    # To this:
+  if hasattr(mat, 'use_shadeless'):
+      # For older Blender versions
+      mat.use_shadeless = True
+  else:
+      # For Blender 2.8+
+      mat.use_nodes = True
+      nodes = mat.node_tree.nodes
+      # Clear default nodes
+      for node in nodes:
+          nodes.remove(node)
+      # Create emission node for shadeless material
+      node_emission = nodes.new(type='ShaderNodeEmission')
+      node_emission.inputs[0].default_value = [r, g, b, 1.0]  # RGBA
+      node_output = nodes.new(type='ShaderNodeOutputMaterial')
+      # Link nodes
+      links = mat.node_tree.links
+      links.new(node_emission.outputs[0], node_output.inputs[0])
+      obj.data.materials[0] = mat
 
   # Render the scene
   bpy.ops.render.render(write_still=True)
@@ -563,9 +622,16 @@ def render_shadeless(blender_objects, path='flat.png'):
   utils.set_layer(bpy.data.objects['Ground'], 0)
 
   # Set the render settings back to what they were
+  # render_args.filepath = old_filepath
+  # render_args.engine = old_engine
+  # render_args.use_antialiasing = old_use_antialiasing
+  # Set the render settings back to what they were
   render_args.filepath = old_filepath
   render_args.engine = old_engine
-  render_args.use_antialiasing = old_use_antialiasing
+  if hasattr(render_args, 'use_antialiasing') and old_use_antialiasing is not None:
+      render_args.use_antialiasing = old_use_antialiasing
+  if hasattr(render_args, 'filter_size') and old_filter_size is not None:
+      render_args.filter_size = old_filter_size
 
   return object_colors
 
