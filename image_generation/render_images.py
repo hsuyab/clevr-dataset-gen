@@ -231,8 +231,9 @@ def render_scene(args,
   render_args.resolution_x = args.width
   render_args.resolution_y = args.height
   render_args.resolution_percentage = 100
-  render_args.tile_x = args.render_tile_size
-  render_args.tile_y = args.render_tile_size
+  #render_args.tile_x = args.render_tile_size
+  #render_args.tile_y = args.render_tile_size
+  bpy.context.scene.cycles.tile_size = args.render_tile_size
   if args.use_gpu == 1:
     # Blender changed the API for enabling CUDA at some point
     if bpy.app.version < (2, 78, 0):
@@ -261,7 +262,8 @@ def render_scene(args,
   }
 
   # Put a plane on the ground so we can compute cardinal directions
-  bpy.ops.mesh.primitive_plane_add(radius=5)
+  #bpy.ops.mesh.primitive_plane_add(radius=5)
+  bpy.ops.mesh.primitive_plane_add(size=10)
   plane = bpy.context.object
 
   def rand(L):
@@ -276,9 +278,17 @@ def render_scene(args,
   # them in the scene structure
   camera = bpy.data.objects['Camera']
   plane_normal = plane.data.vertices[0].normal
-  cam_behind = camera.matrix_world.to_quaternion() * Vector((0, 0, -1))
-  cam_left = camera.matrix_world.to_quaternion() * Vector((-1, 0, 0))
-  cam_up = camera.matrix_world.to_quaternion() * Vector((0, 1, 0))
+  #cam_behind = camera.matrix_world.to_quaternion() * Vector((0, 0, -1))
+  #cam_left = camera.matrix_world.to_quaternion() * Vector((-1, 0, 0))
+  #cam_up = camera.matrix_world.to_quaternion() * Vector((0, 1, 0))
+
+  # In newer Blender versions, quaternion rotation of a vector is done with @
+  # instead of direct multiplication
+  quat = camera.matrix_world.to_quaternion()
+  cam_behind = quat @ Vector((0, 0, -1))
+  cam_left = quat @ Vector((-1, 0, 0))
+  cam_up = quat @ Vector((0, 1, 0))
+
   plane_behind = (cam_behind - cam_behind.project(plane_normal)).normalized()
   plane_left = (cam_left - cam_left.project(plane_normal)).normalized()
   plane_up = cam_up.project(plane_normal).normalized()
@@ -577,4 +587,3 @@ if __name__ == '__main__':
     print('arguments like this:')
     print()
     print('python render_images.py --help')
-

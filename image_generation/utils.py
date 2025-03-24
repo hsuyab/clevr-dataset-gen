@@ -34,11 +34,24 @@ def parse_args(parser, argv=None):
 
 
 # I wonder if there's a better way to do this?
+# def delete_object(obj):
+#   """ Delete a specified blender object """
+#   for o in bpy.data.objects:
+#     o.select = False
+#   obj.select = True
+#   bpy.ops.object.delete()
 def delete_object(obj):
   """ Delete a specified blender object """
-  for o in bpy.data.objects:
-    o.select = False
-  obj.select = True
+  # Deselect all objects
+  bpy.ops.object.select_all(action='DESELECT')
+  
+  # In newer Blender versions, selection is handled differently
+  obj.select_set(True)
+  
+  # Set the active object
+  bpy.context.view_layer.objects.active = obj
+  
+  # Delete the selected object
   bpy.ops.object.delete()
 
 
@@ -100,7 +113,8 @@ def add_object(object_dir, name, scale, loc, theta=0):
 
   # Set the new object as active, then rotate, scale, and translate it
   x, y = loc
-  bpy.context.scene.objects.active = bpy.data.objects[new_name]
+  # bpy.context.scene.objects.active = bpy.data.objects[new_name]
+  bpy.context.view_layer.objects.active = bpy.data.objects[new_name]
   bpy.context.object.rotation_euler[2] = theta
   bpy.ops.transform.resize(value=(scale, scale, scale))
   bpy.ops.transform.translate(value=(x, y, scale))
@@ -169,4 +183,3 @@ def add_material(name, **properties):
       group_node.outputs['Shader'],
       output_node.inputs['Surface'],
   )
-
