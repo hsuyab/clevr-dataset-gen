@@ -324,7 +324,7 @@ def render_scene(args,
   # Render the scene and dump the scene data structure
   scene_struct['objects'] = objects
   scene_struct['relationships'] = compute_all_relationships(scene_struct)
-  print_gpu_info()
+  print_gpu_info() #added this to print the gpu info when running
   while True:
     try:
       bpy.ops.render.render(write_still=True)
