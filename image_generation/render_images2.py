@@ -584,7 +584,14 @@ def render_shadeless(blender_objects, path='flat.png'):
       obj.data.materials[0] = mat
 
   # Render the scene
+  import time
+  # In render_scene function, add:
+  print("Starting render...")
+  start_time = time.time()
   bpy.ops.render.render(write_still=True)
+  end_time = time.time()
+  print(f"Render completed in {end_time - start_time:.2f} seconds")
+  #bpy.ops.render.render(write_still=True)
 
   # Undo the above; first restore the materials to objects
   for mat, obj in zip(old_materials, blender_objects):
@@ -613,19 +620,40 @@ def print_gpu_info():
         if cycles.device == 'GPU':
             if hasattr(bpy.context, 'preferences'):
                 prefs = bpy.context.preferences
-                if hasattr(prefs.addons['cycles'], 'preferences'):
+                if hasattr(prefs, 'addons') and 'cycles' in prefs.addons:
                     cprefs = prefs.addons['cycles'].preferences
                     print(f"Compute device type: {cprefs.compute_device_type}")
                     
-                    # List available devices
+                    # List available devices safely
                     print("Available devices:")
-                    if hasattr(cprefs, 'get_devices'):
-                        for device in cprefs.get_devices():
-                            print(f" - {device.name} ({'ENABLED' if device.use else 'disabled'})")
-                    elif hasattr(cprefs, 'devices'):
-                        for device in cprefs.devices:
-                            print(f" - {device.name} ({'ENABLED' if device.use else 'disabled'})")
+                    try:
+                        if hasattr(cprefs, 'get_devices') and callable(cprefs.get_devices):
+                            devices = cprefs.get_devices()
+                            if devices:
+                                for device in devices:
+                                    print(f" - {device.name} ({'ENABLED' if device.use else 'disabled'})")
+                            else:
+                                print(" - No devices found via get_devices()")
+                        elif hasattr(cprefs, 'devices'):
+                            if cprefs.devices:
+                                for device in cprefs.devices:
+                                    print(f" - {device.name} ({'ENABLED' if device.use else 'disabled'})")
+                            else:
+                                print(" - No devices in cprefs.devices")
+                        else:
+                            print(" - Could not access device information")
+                    except Exception as e:
+                        print(f" - Error accessing devices: {e}")
         print("========================\n")
+    
+    # A more reliable way to check GPU usage on NVIDIA
+    try:
+        import subprocess
+        print("Checking NVIDIA GPU usage...")
+        result = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE, text=True)
+        print(result.stdout)
+    except:
+        print("Could not access nvidia-smi or not an NVIDIA GPU")
 
 if __name__ == '__main__':
   if INSIDE_BLENDER:
